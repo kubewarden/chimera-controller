@@ -27,6 +27,7 @@ const (
 	policiesVolumeName               = "policies"
 	sourcesVolumeName                = "sources"
 	verificationConfigVolumeName     = "verification"
+	clientCAVolumeName               = "client-ca-cert"
 	secretsContainerPath             = "/pki"
 	imagePullSecretVolumeName        = "imagepullsecret"
 	dockerConfigJSONPolicyServerPath = "/home/kubewarden/.docker"
@@ -342,6 +343,34 @@ func (r *PolicyServerReconciler) adaptDeploymentSettingsForPolicyServer(policySe
 				},
 			},
 		)
+	}
+
+	if r.ClientCAConfigMapName != "" {
+		policyServerDeployment.Spec.Template.Spec.Volumes = append(
+			policyServerDeployment.Spec.Template.Spec.Volumes,
+			corev1.Volume{
+				Name: clientCAVolumeName,
+				VolumeSource: corev1.VolumeSource{
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						LocalObjectReference: corev1.LocalObjectReference{
+							Name: r.ClientCAConfigMapName,
+						},
+						Items: []corev1.KeyToPath{
+							{
+								Key:  constants.ClientCACert,
+								Path: constants.ClientCACert,
+							},
+						},
+					},
+				},
+			},
+		)
+
+		admissionContainer := &policyServerDeployment.Spec.Template.Spec.Containers[0]
+		admissionContainer.Env = append(admissionContainer.Env, corev1.EnvVar{
+			Name:  "KUBEWARDEN_CLIENT_CA_FILE",
+			Value: constants.ClientCACert,
+		})
 	}
 }
 
