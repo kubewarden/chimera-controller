@@ -30,6 +30,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	k8spoliciesv1 "k8s.io/api/policy/v1"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -79,6 +80,7 @@ func main() {
 	var enableOtelSidecar bool
 	var openTelemetryClientCertificateSecret string
 	var openTelemetryCertificateSecret string
+	var clientCAConfigMapName string
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8088", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -105,6 +107,7 @@ func main() {
 		"always-accept-admission-reviews-on-deployments-namespace",
 		false,
 		"Always accept admission reviews targeting the deployments-namespace.")
+	flag.StringVar(&clientCAConfigMapName, "client-ca-configmap-name", "", "The name of the ConfigMap containing the client CA certificate. If provided, mTLS will be enabled.")
 
 	opts := zap.Options{}
 	opts.BindFlags(flag.CommandLine)
@@ -134,7 +137,7 @@ func main() {
 		}()
 	}
 
-	mgr, err := setupManager(deploymentsNamespace, metricsAddr, probeAddr, enableLeaderElection)
+	mgr, err := setupManager(deploymentsNamespace, metricsAddr, probeAddr, enableLeaderElection, clientCAConfigMapName != "")
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		retcode = 1
@@ -153,7 +156,14 @@ func main() {
 		OtelCertificateSecret:       openTelemetryCertificateSecret,
 		OtelClientCertificateSecret: openTelemetryClientCertificateSecret,
 	}
-	if err = setupReconcilers(mgr, deploymentsNamespace, webhookServiceName, alwaysAcceptAdmissionReviewsOnDeploymentsNamespace, featureGateAdmissionWebhookMatchConditions, otelConfiguration); err != nil {
+	if err = setupReconcilers(mgr,
+		deploymentsNamespace,
+		webhookServiceName,
+		alwaysAcceptAdmissionReviewsOnDeploymentsNamespace,
+		featureGateAdmissionWebhookMatchConditions,
+		otelConfiguration,
+		clientCAConfigMapName,
+	); err != nil {
 		setupLog.Error(err, "unable to create controllers")
 		retcode = 1
 		return
@@ -181,10 +191,16 @@ func main() {
 	}
 }
 
-func setupManager(deploymentsNamespace string, metricsAddr string, probeAddr string, enableLeaderElection bool) (ctrl.Manager, error) {
+func setupManager(deploymentsNamespace string, metricsAddr string, probeAddr string, enableLeaderElection bool, enableMutualTLS bool) (ctrl.Manager, error) {
 	namespaceSelector := cache.ByObject{
 		Field: fields.ParseSelectorOrDie("metadata.namespace=" + deploymentsNamespace),
 	}
+
+	clientCAName := ""
+	if enableMutualTLS {
+		clientCAName = constants.ClientCACert
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
@@ -227,6 +243,9 @@ func setupManager(deploymentsNamespace string, metricsAddr string, probeAddr str
 				&appsv1.Deployment{}:                 namespaceSelector,
 			},
 		},
+		WebhookServer: webhook.NewServer(webhook.Options{
+			ClientCAName: clientCAName,
+		}),
 	})
 	return mgr, err
 }
@@ -241,7 +260,14 @@ func setupProbes(mgr ctrl.Manager) error {
 	return nil
 }
 
-func setupReconcilers(mgr ctrl.Manager, deploymentsNamespace, webhookServiceName string, alwaysAcceptAdmissionReviewsOnDeploymentsNamespace, featureGateAdmissionWebhookMatchConditions bool, otelConfiguration controller.TelemetryConfiguration) error {
+func setupReconcilers(mgr ctrl.Manager,
+	deploymentsNamespace,
+	webhookServiceName string,
+	alwaysAcceptAdmissionReviewsOnDeploymentsNamespace,
+	featureGateAdmissionWebhookMatchConditions bool,
+	otelConfiguration controller.TelemetryConfiguration,
+	clientCAConfigMapName string,
+) error {
 	if err := (&controller.PolicyServerReconciler{
 		Client:               mgr.GetClient(),
 		Scheme:               mgr.GetScheme(),
@@ -249,6 +275,7 @@ func setupReconcilers(mgr ctrl.Manager, deploymentsNamespace, webhookServiceName
 		DeploymentsNamespace: deploymentsNamespace,
 		AlwaysAcceptAdmissionReviewsInDeploymentsNamespace: alwaysAcceptAdmissionReviewsOnDeploymentsNamespace,
 		TelemetryConfiguration:                             otelConfiguration,
+		ClientCAConfigMapName:                              clientCAConfigMapName,
 	}).SetupWithManager(mgr); err != nil {
 		return errors.Join(errors.New("unable to create PolicyServer controller"), err)
 	}

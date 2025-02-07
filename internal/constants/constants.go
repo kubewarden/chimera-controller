@@ -72,6 +72,9 @@ const (
 	CARootPrivateKey = "ca.key"
 	OldCARootCert    = "old-ca.crt"
 
+	// Client CA ConfigMap.
+	ClientCACert = "client-ca.crt"
+
 	// Certs.
 	CertExpirationYears  = 10
 	CACertExpiration     = 10 * 365 * 24 * time.Hour
