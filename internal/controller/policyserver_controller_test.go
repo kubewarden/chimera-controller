@@ -1,5 +1,3 @@
-//go:build testing
-
 /*
 copyright 2022.
 
@@ -658,6 +656,37 @@ var _ = Describe("PolicyServer controller", func() {
 				))
 				return nil
 			}).Should(Succeed())
+		})
+
+		It("should enable mTLS in the policy server deployment", func() {
+			policyServer := policiesv1.NewPolicyServerFactory().WithName(policyServerName).Build()
+			createPolicyServerAndWaitForItsService(ctx, policyServer)
+
+			deployment, err := getTestPolicyServerDeployment(ctx, policyServerName)
+			Expect(err).ToNot(HaveOccurred())
+
+			container := deployment.Spec.Template.Spec.Containers[0]
+
+			By("specifing the client ca certificate")
+			Expect(container.Env).To(ContainElement(MatchFields(IgnoreExtras, Fields{
+				"Name":  Equal("KUBEWARDEN_CLIENT_CA_FILE"),
+				"Value": Equal(constants.ClientCACert),
+			})))
+
+			Expect(deployment.Spec.Template.Spec.Volumes).To(ContainElement(MatchFields(IgnoreExtras, Fields{
+				"Name": Equal(clientCAVolumeName),
+				"VolumeSource": MatchFields(IgnoreExtras, Fields{
+					"ConfigMap": PointTo(MatchFields(IgnoreExtras, Fields{
+						"LocalObjectReference": MatchFields(IgnoreExtras, Fields{
+							"Name": Equal("client-ca"),
+						}),
+						"Items": ConsistOf(MatchFields(IgnoreExtras, Fields{
+							"Key":  Equal(constants.ClientCACert),
+							"Path": Equal(constants.ClientCACert),
+						})),
+					})),
+				}),
+			})))
 		})
 
 		It("should set the configMap version as a deployment annotation", func() {

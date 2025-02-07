@@ -1,5 +1,3 @@
-//go:build testing
-
 /*
 Copyright 2022.
 
@@ -44,6 +42,7 @@ import (
 const (
 	integrationTestsFinalizer   = "integration-tests-safety-net-finalizer"
 	defaultKubewardenRepository = "ghcr.io/kubewarden/policy-server"
+	clientCAConfigMapName       = "client-ca"
 )
 
 func getTestAdmissionPolicy(ctx context.Context, namespace, name string) (*policiesv1.AdmissionPolicy, error) {

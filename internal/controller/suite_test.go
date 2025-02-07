@@ -148,9 +148,10 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&PolicyServerReconciler{
-		Client:               k8sManager.GetClient(),
-		Scheme:               k8sManager.GetScheme(),
-		DeploymentsNamespace: deploymentsNamespace,
+		Client:                k8sManager.GetClient(),
+		Scheme:                k8sManager.GetScheme(),
+		DeploymentsNamespace:  deploymentsNamespace,
+		ClientCAConfigMapName: clientCAConfigMapName,
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
