@@ -670,7 +670,7 @@ var _ = Describe("PolicyServer controller", func() {
 			By("specifing the client ca certificate")
 			Expect(container.Env).To(ContainElement(MatchFields(IgnoreExtras, Fields{
 				"Name":  Equal("KUBEWARDEN_CLIENT_CA_FILE"),
-				"Value": Equal(constants.ClientCACert),
+				"Value": Equal(fmt.Sprintf("%s,%s", constants.CARootCert, constants.ClientCACert)),
 			})))
 
 			Expect(deployment.Spec.Template.Spec.Volumes).To(ContainElement(MatchFields(IgnoreExtras, Fields{

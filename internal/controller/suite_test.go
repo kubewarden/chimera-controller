@@ -179,6 +179,20 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	})
 	Expect(err).NotTo(HaveOccurred())
 
+	// Create the client CA config map
+	clientCACertBytes, _, err := certs.GenerateCA(time.Now(), time.Now().Add(constants.CACertExpiration))
+	Expect(err).NotTo(HaveOccurred())
+	err = k8sClient.Create(ctx, &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      clientCAConfigMapName,
+			Namespace: deploymentsNamespace,
+		},
+		Data: map[string]string{
+			constants.ClientCACert: string(clientCACertBytes),
+		},
+	})
+	Expect(err).NotTo(HaveOccurred())
+
 	go func() {
 		defer GinkgoRecover()
 		err = k8sManager.Start(ctx)
