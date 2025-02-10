@@ -1,5 +1,3 @@
-//go:build testing
-
 /*
 Copyright 2022.
 

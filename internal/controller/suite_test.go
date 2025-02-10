@@ -148,9 +148,10 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 	Expect(err).ToNot(HaveOccurred())
 
 	err = (&PolicyServerReconciler{
-		Client:               k8sManager.GetClient(),
-		Scheme:               k8sManager.GetScheme(),
-		DeploymentsNamespace: deploymentsNamespace,
+		Client:                k8sManager.GetClient(),
+		Scheme:                k8sManager.GetScheme(),
+		DeploymentsNamespace:  deploymentsNamespace,
+		ClientCAConfigMapName: clientCAConfigMapName,
 	}).SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
@@ -174,6 +175,20 @@ var _ = SynchronizedBeforeSuite(func() []byte {
 		Data: map[string][]byte{
 			constants.CARootCert:       caCertBytes,
 			constants.CARootPrivateKey: caPrivateKey,
+		},
+	})
+	Expect(err).NotTo(HaveOccurred())
+
+	// Create the client CA config map
+	clientCACertBytes, _, err := certs.GenerateCA(time.Now(), time.Now().Add(constants.CACertExpiration))
+	Expect(err).NotTo(HaveOccurred())
+	err = k8sClient.Create(ctx, &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      clientCAConfigMapName,
+			Namespace: deploymentsNamespace,
+		},
+		Data: map[string]string{
+			constants.ClientCACert: string(clientCACertBytes),
 		},
 	})
 	Expect(err).NotTo(HaveOccurred())

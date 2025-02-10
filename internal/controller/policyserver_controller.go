@@ -61,6 +61,7 @@ type PolicyServerReconciler struct {
 	Scheme                                             *runtime.Scheme
 	DeploymentsNamespace                               string
 	AlwaysAcceptAdmissionReviewsInDeploymentsNamespace bool
+	ClientCAConfigMapName                              string
 }
 
 // TelemetryConfiguration is a struct that contains the configuration for the
@@ -261,6 +262,7 @@ func (r *PolicyServerReconciler) enqueueAdmissionPolicyGroup(_ context.Context, 
 		},
 	}
 }
+
 func (r *PolicyServerReconciler) enqueueClusterAdmissionPolicy(_ context.Context, object client.Object) []reconcile.Request {
 	// The watch will trigger twice per object change; once with the old
 	// object, and once the new object. We need to be mindful when doing
